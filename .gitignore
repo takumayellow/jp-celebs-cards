@@ -3,9 +3,5 @@ data/data.js
 logs/
 *.log
 .DS_Store
-images/
-images/
-images/
 
 *.bak
-images/
