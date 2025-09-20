@@ -1,38 +1,27 @@
 ﻿name: Deploy to GitHub Pages
-
 on:
-  push:
-    branches: [ main ]
+  push: { branches: [ main ] }
   workflow_dispatch:
-
 permissions:
   contents: read
   pages: write
   id-token: write
-
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          lfs: true   # ← 画像を Git LFS に乗せた場合でも実体を取得する
+      - uses: actions/checkout@v4
+        with: { lfs: true }          # 画像を LFS にしていても実体取得OK
       - name: Prepare site dir
+        shell: bash
         run: |
           mkdir -p site
-          rsync -av \
-            --exclude='.git' --exclude='.github' \
-            --exclude='logs' --exclude='tools' \
-            ./ site/
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
+          rsync -av --exclude='.git' --exclude='.github' --exclude='logs' --exclude='tools' ./ site/
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -40,6 +29,5 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy
-        id: deployment
+      - id: deployment
         uses: actions/deploy-pages@v4
