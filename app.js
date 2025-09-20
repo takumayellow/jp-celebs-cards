@@ -1,125 +1,108 @@
-﻿(() => {
-  const $ = (s) => document.querySelector(s);
-  const $$ = (s) => Array.from(document.querySelectorAll(s));
-  const img = $("#face"), noimg=$("#noimg");
-  const elName=$("#name"), elYomi=$("#yomi"), elCat=$("#cat");
-  const elCountTotal=$("#countTotal"), elCountLeft=$("#countLeft"), elCountKnown=$("#countKnown");
-  const q=$("#q"), filterCat=$("#filterCat");
-  const flipBtn=$("#flipBtn"), okBtn=$("#okBtn"), againBtn=$("#againBtn"), shuffleBtn=$("#shuffleBtn"), resetBtn=$("#resetBtn");
-
-  // ---- Data ----
-  const ALL = (window.CELEBS || []).map((x,i)=>({ id: x.id || String(i+1).padStart(4,"0"), ...x }));
-  const CAT_SET = [...new Set(ALL.map(x=>x.category))].sort();
-  CAT_SET.forEach(c=>{
-    const o=document.createElement("option"); o.value=c; o.textContent=c; filterCat.appendChild(o);
-  });
-
-  // ---- Progress ----
-  const KEY = "celeb_known_ids_v1";
-  const loadKnown = () => new Set(JSON.parse(localStorage.getItem(KEY)||"[]"));
-  const saveKnown = (set) => localStorage.setItem(KEY, JSON.stringify([...set]));
-  let known = loadKnown();
-
-  // ---- State ----
-  let filtered = [...ALL];
-  let idx = 0;
-  let flipped = false;
-
-  function sanitizeFilename(str){
-    return (str||"").normalize("NFKC").replace(/[^\p{Letter}\p{Number}]+/gu,"_").replace(/^_+|_+$/g,"").toLowerCase();
-  }
-  function imageCandidates(item){
-    const base = "images/";
-    const baseId = item.id;
-    const slug = sanitizeFilename(item.name);
-    const exts = [".jpg",".jpeg",".png",".webp"];
-    // Try explicit image property, then id.*, then slug.*
-    const list = [];
-    if(item.image){ list.push(base+item.image); }
-    exts.forEach(e=> list.push(base+baseId+e));
-    exts.forEach(e=> list.push(base+slug+e));
-    return list;
-  }
-
-  function setImage(item){
-    const cands = imageCandidates(item);
-    let tried = 0;
-    function tryNext(){
-      if(tried>=cands.length){ img.style.display="none"; noimg.style.display="flex"; return; }
-      const src = cands[tried++];
-      img.onerror = () => tryNext();
-      img.onload = () => { noimg.style.display="none"; img.style.display="block"; };
-      img.src = src;
-    }
-    tryNext();
-  }
-
-  function formatRuby(name,yomi){
-    if(!yomi) return name;
-    return `<ruby>${name}<rt>${yomi}</rt></ruby>`;
-  }
-
-  function renderCounts(){
-    elCountTotal.textContent = ALL.length;
-    elCountKnown.textContent = known.size;
-    const left = filtered.filter(x=> !known.has(x.id)).length;
-    elCountLeft.textContent = left;
-  }
-
-  function applyFilter(){
-    const term = (q.value||"").toLowerCase();
-    const cat = filterCat.value || "";
-    filtered = ALL.filter(x=>{
-      if(cat && x.category!==cat) return false;
-      const target = `${x.name} ${x.yomi} ${x.category}`.toLowerCase();
-      return target.includes(term);
+﻿async function fetchText(url){ const r = await fetch(url,{cache:"no-store"}); if(!r.ok) throw new Error(url+" "+r.status); return await r.text(); }
+function parseTSV(txt){
+  const lines = txt.replace(/^\uFEFF/,'').split(/\r?\n/).filter(Boolean);
+  const [h,...rows] = lines;
+  const idx = Object.fromEntries(h.split("\t").map((k,i)=>[k.trim(),i]));
+  return rows.map(line=>{
+    const c=line.split("\t"); return ({
+      id:c[idx.id], name:c[idx.name], yomi:c[idx.yomi]||"", category:c[idx.category]||""
     });
-    idx = 0;
-    renderCounts();
-    renderCard();
-  }
-
-  function renderCard(){
-    if(filtered.length===0){ $("#front").innerHTML = "<div class='hint'>該当カードがありません</div>"; $("#back").innerHTML=""; img.style.display="none"; noimg.style.display="flex"; return; }
-    const item = filtered[idx % filtered.length];
-    setImage(item);
-    $("#front").innerHTML = "<div class='hint'>写真 → 名前を推測</div>";
-    $("#back").innerHTML = "";
-    elName.innerHTML = formatRuby(item.name, item.yomi);
-    elYomi.textContent = item.yomi? "（"+item.yomi+"）": "";
-    elCat.textContent = "カテゴリ: "+item.category;
-    flipped = false; document.body.classList.remove("flipped");
-    renderCounts();
-  }
-
-  function flip(){ flipped = !flipped; document.body.classList.toggle("flipped", flipped); if(flipped){ $("#back").appendChild(elName); $("#back").appendChild(elYomi); $("#back").appendChild(elCat); } }
-
-  function next(markKnown){
-    const item = filtered[idx % filtered.length];
-    if(markKnown){ known.add(item.id); saveKnown(known); }
-    idx = (idx+1) % filtered.length;
-    flipped = false; document.body.classList.remove("flipped");
-    renderCounts();
-    renderCard();
-  }
-
-  flipBtn.addEventListener("click", flip);
-  okBtn.addEventListener("click", ()=> next(true));
-  againBtn.addEventListener("click", ()=> next(false));
-  shuffleBtn.addEventListener("click", ()=>{
-    for(let i=filtered.length-1;i>0;i--){ const j=(Math.random()* (i+1))|0; [filtered[i],filtered[j]]=[filtered[j],filtered[i]]; }
-    idx = 0; renderCard();
   });
-  resetBtn.addEventListener("click", ()=>{ if(confirm("進捗（既学習）をリセットしますか？")){ known.clear(); saveKnown(known); renderCounts(); } });
-
-  q.addEventListener("input", applyFilter);
-  filterCat.addEventListener("change", applyFilter);
-
-  document.addEventListener("keydown",(e)=>{
-    if(e.key===" "){ e.preventDefault(); flip(); }
-    if(e.key==="ArrowRight"){ next(true); }
-    if(e.key==="ArrowLeft"){ next(false); }
+}
+function parseCSV(txt){
+  const lines = txt.replace(/^\uFEFF/,'').split(/\r?\n/).filter(Boolean);
+  const [h,...rows] = lines;
+  const idx = Object.fromEntries(h.split(",").map((k,i)=>[k.trim(),i]));
+  return rows.map(l=>{
+    const c = l.split(/,(.*?),(.*?),(.*?),(.*?),(.*?)/).length>1 ? l.match(/(".*?"|[^,]+)/g).map(s=>s.replace(/^"|"$/g,'')) : l.split(",");
+    return {
+      id: c[idx.id], name:c[idx.name], source:c[idx.source], filename:c[idx.filename],
+      license:c[idx.license], artist:c[idx.artist], credit:c[idx.credit]
+    };
   });
+}
+async function loadData(){
+  const [tsv, csv] = await Promise.all([
+    fetchText('data/cards.tsv'),
+    fetch('data/attributions.csv',{cache:"no-store"}).then(r=>r.ok?r.text():"id,name,source,filename,license,artist,credit\n")
+  ]);
+  const cards = parseTSV(tsv);
+  const attrs = parseCSV(csv);
+  const map = {}; const meta = {};
+  for(const a of attrs){ if(a.id && a.filename){ map[a.id]=a.filename; meta[a.id]=a; } }
+  return {cards, map, meta};
+}
 
-  applyFilter();
+// UI
+const state = { all:[], filtered:[], i:0, map:{}, meta:{} };
+
+function imgUrlFor(id){
+  const file = state.map[id] || (id + '.jpg');
+  return 'images/' + encodeURIComponent(file);
+}
+function renderCounters(){
+  const total = state.filtered.length;
+  document.querySelector('#count-total').textContent = total;
+  document.querySelector('#count-rest').textContent = (total - state.i);
+}
+function renderCard(){
+  const wrap = document.querySelector('#card'); wrap.innerHTML = '';
+  if(state.i >= state.filtered.length){ wrap.textContent = '該当カードがありません'; return; }
+  const c = state.filtered[state.i];
+
+  const img = new Image(); img.loading='lazy'; img.alt=c.name;
+  img.src = imgUrlFor(c.id);
+  img.onerror = ()=>{ img.remove(); ph.style.display='block'; };
+
+  const ph = document.createElement('div'); ph.className='placeholder'; ph.textContent='画像なし'; ph.style.display='none';
+
+  const caption = document.createElement('div'); caption.className='caption';
+  caption.innerHTML = `<div class="name">${c.name}</div><div class="yomi">${c.yomi||''}</div><div class="cat">${c.category||''}</div>`;
+
+  // credit
+  const cr = document.createElement('div'); cr.className='credit';
+  const a = state.meta[c.id];
+  if(a){
+    cr.innerHTML = `Source: ${a.source} / License: ${a.license || 'Unknown'} ${a.artist?(' / © '+a.artist):''}`;
+  }
+
+  wrap.append(img, ph, caption, cr);
+  renderCounters();
+}
+function applyFilter(){
+  const q  = document.querySelector('#q').value.trim();
+  const cat= document.querySelector('#cat').value;
+  const norm = s => (s||'').toLowerCase();
+  state.filtered = state.all.filter(c=>{
+    const okQ = !q || [c.name,c.yomi].some(x=>norm(x).includes(norm(q)));
+    const okC = (cat==='__ALL__') || (c.category===cat);
+    return okQ && okC;
+  });
+  state.i = 0;
+  renderCard();
+}
+function populateCategories(cards){
+  const sel = document.querySelector('#cat');
+  const cats = Array.from(new Set(cards.map(c=>c.category).filter(Boolean))).sort();
+  sel.innerHTML = '<option value="__ALL__">すべてのカテゴリ</option>' + cats.map(c=>`<option>${c}</option>`).join('');
+}
+
+// Initialize
+(async ()=>{
+  const {cards, map, meta} = await loadData();
+  state.all = cards; state.map = map; state.meta = meta;
+  populateCategories(cards);
+  state.filtered = [...cards];
+  renderCard();
+
+  // controls
+  document.querySelector('#q').addEventListener('input', applyFilter);
+  document.querySelector('#cat').addEventListener('change', applyFilter);
+  document.querySelector('#next').addEventListener('click', ()=>{ if(state.i<state.filtered.length-1){ state.i++; renderCard(); } });
+  document.querySelector('#prev').addEventListener('click', ()=>{ if(state.i>0){ state.i--; renderCard(); } });
+  document.querySelector('#shuffle').addEventListener('click', ()=>{
+    for(let i=state.filtered.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [state.filtered[i],state.filtered[j]]=[state.filtered[j],state.filtered[i]]; }
+    state.i=0; renderCard();
+  });
+  document.querySelector('#reset').addEventListener('click', ()=>{ document.querySelector('#q').value=''; document.querySelector('#cat').value='__ALL__'; applyFilter(); });
 })();
