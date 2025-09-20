@@ -6,3 +6,5 @@ logs/
 images/
 images/
 images/
+
+*.bak
