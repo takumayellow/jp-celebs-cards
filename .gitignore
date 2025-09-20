@@ -1,0 +1,8 @@
+﻿# build artifacts
+data/data.js
+logs/
+*.log
+.DS_Store
+images/
+images/
+images/

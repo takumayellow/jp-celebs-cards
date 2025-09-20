@@ -1,0 +1,78 @@
+﻿<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>芸能人 暗記カード（ローカル）</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="topbar">
+  <h1>芸能人 暗記カード</h1>
+  <div class="controls">
+    <input id="q" type="search" placeholder="検索（名前・よみ・カテゴリ）" />
+    <select id="filterCat">
+      <option value="">すべてのカテゴリ</option>
+    </select>
+    <button id="shuffleBtn">シャッフル</button>
+    <button id="resetBtn" title="進捗をリセット">リセット</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <aside class="stats">
+    <div>総数: <span id="countTotal">0</span></div>
+    <div>残り: <span id="countLeft">0</span></div>
+    <div>既学習: <span id="countKnown">0</span></div>
+  </aside>
+
+  <section id="card" class="card">
+    <div class="imgWrap">
+      <img id="face" alt="photo" />
+      <div id="noimg" class="noimg">画像なし</div>
+    </div>
+    <div class="front" id="front">
+      <div class="hint">写真 → 名前を推測</div>
+    </div>
+    <div class="back" id="back">
+      <div class="name" id="name"></div>
+      <div class="yomi" id="yomi"></div>
+      <div class="cat" id="cat"></div>
+    </div>
+  </section>
+
+  <section class="buttons">
+    <button id="flipBtn">答えを見る [Space]</button>
+    <button id="againBtn">あとで [←]</button>
+    <button id="okBtn" class="ok">わかった [→]</button>
+  </section>
+
+  <section class="help">
+    <details>
+      <summary>画像の入れ方 / 運用メモ</summary>
+      <ol>
+        <li><code>images</code> フォルダに顔写真ファイルを入れる。</li>
+        <li>原則のファイル名は <code>images/&lt;id&gt;.jpg</code> 形式（IDはデータ側で付与済み）。</li>
+        <li>拡張子は <code>.jpg/.jpeg/.png/.webp</code> に対応（同じIDに複数ある場合は .jpg 優先）。</li>
+        <li>画像が無いカードは「画像なし」プレースホルダが出る。</li>
+      </ol>
+      <p>※ ライセンス・肖像権に注意。個人の学習利用に限定し、配布は避けること。</p>
+    </details>
+
+    <details>
+      <summary>データの編集（全部ターミナル）</summary>
+      <ol>
+        <li><code>data\cards.tsv</code> を増補（TSV：<code>nameyomicategoryid(optional)</code>）。</li>
+        <li>以下を実行：<br>
+          <code>powershell -ExecutionPolicy Bypass .\tools\build.ps1</code>
+        </li>
+        <li><code>index.html</code> を再読み込み。</li>
+      </ol>
+    </details>
+  </section>
+</main>
+
+<script src="data/data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
