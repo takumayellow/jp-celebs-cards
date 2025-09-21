@@ -70,7 +70,14 @@
       </ol>
     </details>
   </section>
-</main><script src="app.js"></script>
+</main><script id="datajs-shim">
+/* shim: app.js が期待する DATA_TSV を必ず用意する */
+(function(w){
+  // 空 TSV（ヘッダ行のみ）。本物のデータは boot スクリプトで with_images.tsv から供給する
+  w.DATA_TSV = "name\tyomi\tcategory\tid\n";
+})(window);
+</script>
+</script>
 <div class="hud"><span>総数: <b id="count-total">0</b></span>　<span>残り: <b id="count-rest">0</b></span></div><div id="controls"><input id="q" placeholder="検索（名前・よみ・カテ）"/><select id="cat"></select><button id="prev">←</button><button id="next">→</button><button id="shuffle">シャッフル</button><button id="reset">リセット</button></div><div id="card" class="card"></div><!-- === counters + deck boot === -->
 <div id="img-counters" style="margin:8px 0; opacity:.9; display:flex; gap:12px; font-size:.95rem">
   <div>総数: <b id="countTotal">0</b></div>
@@ -317,6 +324,7 @@ setTimeout(() => { ensureDeck(); }, 500);
 </script>
 </body>
 </html>
+
 
 
 
