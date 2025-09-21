@@ -258,8 +258,69 @@ setTimeout(() => { ensureDeck(); }, 500);
   }
 })();
 </script>
+<!-- boot: robust deck builder (cards.tsv + attr_map.json) -->
+<script id="boot-images-v3">
+(async () => {
+  // 小道具
+  const txt = async (u)=>{try{const r=await fetch(u,{cache:"no-store"}); return r.ok?await r.text():"";}catch{ return ""}};
+  const json= async (u)=>{try{const r=await fetch(u,{cache:"no-store"}); return r.ok?await r.json():{};}catch{ return {}}};
+  const csv = t => t.replace(/^\uFEFF/,"").trim().split(/\r?\n/).map(l=>l.split("\t"));
+  const alias = c => { c.photo=c.photo||c.image; c.img=c.img||c.image; c.imageUrl=c.imageUrl||c.image; return c; };
+
+  try{
+    // 1) まず with_images.tsv を試す（ダメなら cards.tsv にフォールバック）
+    let rows = [];
+    const w = await txt("data/with_images.tsv");
+    if(w){
+      const a = csv(w); const head=a.shift(); const col=Object.fromEntries(head.map((h,i)=>[h,i]));
+      rows = a.filter(r=>r.length>=4).map(r=>({
+        id:r[col?.id ?? 3], name:r[col?.name ?? 0], yomi:r[col?.yomi ?? 1], category:r[col?.category ?? 2],
+        image:r[col?.image ?? 4] || ""  // 列が無い場合は後で map から埋める
+      }));
+    }
+    if(rows.length===0){
+      const t = await txt("data/cards.tsv");
+      if(t){
+        const a = csv(t); const head=a.shift(); const col=Object.fromEntries(head.map((h,i)=>[h,i]));
+        rows = a.filter(r=>r.length>=4).map(r=>({
+          id:r[col?.id ?? 3], name:r[col?.name ?? 0], yomi:r[col?.yomi ?? 1], category:r[col?.category ?? 2]
+        }));
+      }
+    }
+
+    // 2) 画像ファイル名マップを適用
+    const map = await json("data/attr_map.json");
+    const deck = rows.filter(c => map[c.id]).map(c => alias({...c, image: `images/${map[c.id]}`}));
+
+    // 3) グローバルに載せる（既存UI互換）
+    window.cards = rows;
+    window.currentDeck = deck;
+
+    // 4) カウンタ（存在すれば）更新
+    const m = await json("data/metrics.json");
+    const g = id => document.getElementById(id);
+    if(m && g('countTotal')){ g('countTotal').textContent   = m.total ?? 0;
+      g('countWithImg').textContent = m.withImg ?? 0;
+      g('countImages').textContent  = m.images ?? 0;
+      g('countMissing').textContent = m.missing ?? 0;
+    }
+
+    // 5) UI起動（startStudy 等が定義されるまで待って呼ぶ）
+    let tries = 0;
+    (function boot(){
+      const f = window.startStudy || window.startStudyWithDeck || window.init || window.boot;
+      if(typeof f === "function"){ f(window.currentDeck); }
+      else if(tries++ < 60){ setTimeout(boot, 100); }
+      else { console.warn("[boot-images] start function not found"); }
+    })();
+
+    console.info("[boot-images] rows=", rows.length, "deck=", deck.length);
+  }catch(e){ console.error("[boot-images]", e); }
+})();
+</script>
 </body>
 </html>
+
 
 
 
