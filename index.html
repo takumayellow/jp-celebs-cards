@@ -209,8 +209,41 @@ setTimeout(() => { ensureDeck(); }, 500);
   }catch(e){}
 })();
 </script>
+<script id="boot-with-images">
+(async ()=>{
+  const stripBom=s=>s&&s.charCodeAt(0)===0xFEFF?s.slice(1):s;
+  const tsvParse=t=>{
+    t=stripBom(t);
+    const ls=t.split(/\r?\n/).filter(Boolean);
+    if(ls.length===0) return [];
+    const keys=ls.shift().split('\t');
+    return ls.map(l=>{
+      const v=l.split('\t'); const o={};
+      for(let i=0;i<keys.length;i++) o[keys[i]]=v[i];
+      return o;
+    });
+  };
+  const loadAttr=async()=>{
+    const r=await fetch('data/attr_map.json',{cache:'no-store'});
+    return new Map(Object.entries(await r.json()));
+  };
+  try{
+    const [t,attr]=await Promise.all([
+      fetch('data/with_images.tsv',{cache:'no-store'}).then(r=>r.ok?r.text():''),
+      loadAttr()
+    ]);
+    const cards=tsvParse(t);
+    const deck=cards.filter(c=>attr.has(c.id));
+    deck.forEach(c=>c.image='images/'+attr.get(c.id));
+    console.log('[boot] cards=',cards.length,'with images=',deck.length,deck[0]);
+    window.currentDeck=deck;
+    if(typeof startStudy==='function') startStudy(deck);
+  }catch(e){ console.error('[boot error]',e); }
+})();
+</script>
 </body>
 </html>
+
 
 
 
