@@ -322,8 +322,47 @@ setTimeout(() => { ensureDeck(); }, 500);
   }catch(e){ console.error("[boot-images]", e); }
 })();
 </script>
+
+<script id="boot-images-v4">
+(()=>{ const log=(...a)=>console.log('[boot-images]',...a);
+const idStr=x=>(''+x).trim();
+const tsvParse=t=>{
+  const s=t.replace(/^\uFEFF/,'').trim();
+  const lines=s? s.split(/\r?\n/):[];
+  if(lines.length<2) return [];
+  const head=lines.shift().split('\t');
+  return lines.filter(Boolean).map(r=>{
+    const v=r.split('\t'),o={};
+    for(let i=0;i<head.length;i++) o[head[i]]=v[i];
+    return o;
+  });
+};
+async function loadAttr(){
+  try{
+    const r=await fetch('data/attr_map.json?'+Math.random(),{cache:'no-store'});
+    if(!r.ok) return new Map();
+    return new Map(Object.entries(await r.json()));
+  }catch{ return new Map(); }
+}
+async function ensureDeck(){
+  try{
+    const txt=await fetch('data/with_images.tsv?'+Math.random(),{cache:'no-store'}).then(r=>r.ok?r.text():'');
+    if(!txt){ log('no with_images.tsv'); return false; }
+    const rows=tsvParse(txt);
+    const attr=await loadAttr();
+    const deck=rows.filter(c=>attr.has(idStr(c.id)));
+    deck.forEach(c=> c.image='images/'+attr.get(idStr(c.id)));
+    window.currentDeck=deck; log('rows=',rows.length,'deck=',deck.length);
+    if(typeof window.startStudy==='function'){ window.startStudy(deck); }
+    return deck.length>0;
+  }catch(e){ console.error(e); return false; }
+}
+ensureDeck();
+})();
+</script>
 </body>
 </html>
+
 
 
 
