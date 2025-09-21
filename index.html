@@ -74,6 +74,46 @@
 
 <script src="data/data.js"></script>
 <script src="app.js"></script>
-<div class="hud"><span>総数: <b id="count-total">0</b></span>　<span>残り: <b id="count-rest">0</b></span></div><div id="controls"><input id="q" placeholder="検索（名前・よみ・カテ）"/><select id="cat"></select><button id="prev">←</button><button id="next">→</button><button id="shuffle">シャッフル</button><button id="reset">リセット</button></div><div id="card" class="card"></div></body>
+<div class="hud"><span>総数: <b id="count-total">0</b></span>　<span>残り: <b id="count-rest">0</b></span></div><div id="controls"><input id="q" placeholder="検索（名前・よみ・カテ）"/><select id="cat"></select><button id="prev">←</button><button id="next">→</button><button id="shuffle">シャッフル</button><button id="reset">リセット</button></div><div id="card" class="card"></div><!-- === counters + deck boot === -->
+<div id="img-counters" style="margin:8px 0; opacity:.9; display:flex; gap:12px; font-size:.95rem">
+  <div>総数: <b id="countTotal">0</b></div>
+  <div>画像あり: <b id="countWithImg">0</b></div>
+  <div>欠落: <b id="countMissing">0</b></div>
+  <div>画像ファイル: <b id="countImages">0</b></div>
+</div>
+
+<script>
+(async () => {
+  try {
+    const r = await fetch('data/metrics.json', {cache:'no-store'});
+    if (!r.ok) return;
+    const m = await r.json();
+    const g = id => document.getElementById(id);
+    if (g('countTotal'))   g('countTotal').textContent   = m.total   ?? 0;
+    if (g('countWithImg')) g('countWithImg').textContent = m.withImg ?? 0;
+    if (g('countMissing')) g('countMissing').textContent = m.missing ?? 0;
+    if (g('countImages'))  g('countImages').textContent  = m.images  ?? 0;
+  } catch {}
+})();
+
+// 画像があるカードだけで学習を開始（app.js 側に startStudy(cards) がある前提）
+async function ensureDeck(){
+  try {
+    const r = await fetch('data/with_images.tsv', {cache:'no-store'});
+    if (!r.ok) return false;
+    const t = await r.text();
+    if (!window.tsvParse) return false;
+    const cards = tsvParse(t);
+    if (!cards || !cards.length) return false;
+    if (typeof startStudy === 'function') startStudy(cards);
+    return true;
+  } catch { return false; }
+}
+setTimeout(() => { ensureDeck(); }, 500);
+</script>
+<!-- === /counters + deck boot === -->
+
+</body>
 </html>
+
 
