@@ -113,7 +113,46 @@ setTimeout(() => { ensureDeck(); }, 500);
 </script>
 <!-- === /counters + deck boot === -->
 
+
+<!-- boot injected -->
+<script>
+// デッキ読込→UI開始
+(async ()=>{
+  const toUrl = u => u+(u.includes("?")?"&":"?")+"v="+Date.now();
+  const tsvParse = (t)=>{
+    const lines=t.trim().split(/\r?\n/);
+    const head = lines.shift().split('\t');
+    return lines.map(l=>{
+      const cols=l.split('\t'), o={};
+      head.forEach((h,i)=>o[h]=cols[i]??'');
+      return o;
+    });
+  };
+
+  // 1) TSV/マップ読込
+  const tsvTxt = await fetch(toUrl('data/with_images.tsv'), {cache:'no-store'}).then(r=>r.ok?r.text():'').catch(()=> '');
+  if(!tsvTxt){ console.warn('with_images.tsv not found'); return; }
+  const rows = tsvParse(tsvTxt);
+  const map  = await fetch(toUrl('data/attr_map.json'), {cache:'no-store'}).then(r=>r.ok?r.json():{}).catch(()=> ({}));
+
+  // 2) 画像があるカードだけ残して image パス付与
+  const deck = rows.filter(c => map[c.id]).map(c => ({...c, image: 'images/' + map[c.id]}));
+
+  // 3) グローバルに載せてUI起動
+  window.cards = deck;
+  window.currentDeck = deck;
+
+  if (typeof window.startStudy === 'function') {
+    window.startStudy(deck);
+  } else {
+    // フォールバック：最初の画像を直接描画（img要素推測）
+    const img = document.querySelector('img#photo, img#card-img, .card img, img');
+    if (img && deck[0]?.image) img.src = deck[0].image;
+  }
+})();
+</script>
 </body>
 </html>
+
 
 
