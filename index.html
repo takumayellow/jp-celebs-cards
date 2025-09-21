@@ -211,6 +211,7 @@ setTimeout(() => { ensureDeck(); }, 500);
 </script>
 <script id="boot-with-images">
 (async ()=>{
+  // --- helpers ---
   const stripBom=s=>s&&s.charCodeAt(0)===0xFEFF?s.slice(1):s;
   const tsvParse=t=>{
     t=stripBom(t);
@@ -223,26 +224,43 @@ setTimeout(() => { ensureDeck(); }, 500);
       return o;
     });
   };
-  const loadAttr=async()=>{
-    const r=await fetch('data/attr_map.json',{cache:'no-store'});
-    return new Map(Object.entries(await r.json()));
-  };
+  const waitFor=(pred,timeout=5000)=>new Promise(r=>{
+    const t=Date.now(); const id=setInterval(()=>{
+      if(pred()||Date.now()-t>timeout){clearInterval(id);r();}
+    },50);
+  });
+
   try{
-    const [t,attr]=await Promise.all([
+    // データ取得
+    const [t,attrJson] = await Promise.all([
       fetch('data/with_images.tsv',{cache:'no-store'}).then(r=>r.ok?r.text():''),
-      loadAttr()
+      fetch('data/attr_map.json',{cache:'no-store'}).then(r=>r.ok?r.json():{})
     ]);
-    const cards=tsvParse(t);
-    const deck=cards.filter(c=>attr.has(c.id));
-    deck.forEach(c=>c.image='images/'+attr.get(c.id));
-    console.log('[boot] cards=',cards.length,'with images=',deck.length,deck[0]);
-    window.currentDeck=deck;
-    if(typeof startStudy==='function') startStudy(deck);
-  }catch(e){ console.error('[boot error]',e); }
+    const cards = t ? tsvParse(t) : [];
+    const attr  = new Map(Object.entries(attrJson));
+    const deck  = cards.filter(c=>attr.has(c.id));
+    deck.forEach(c=>c.image = 'images/' + attr.get(c.id));
+
+    // グローバルへ渡す（アプリ側が参照できるように）
+    window.cards = deck;
+    window.currentDeck = deck;
+
+    // アプリ初期化待ち → startStudy 呼び出し
+    await waitFor(()=>typeof window.startStudy==='function', 6000);
+    if(typeof window.startStudy==='function'){
+      window.startStudy(deck);
+      console.log('[boot] startStudy with', deck.length, 'cards');
+    }else{
+      console.warn('[boot] startStudy not found; deck only set globally.');
+    }
+  }catch(e){
+    console.error('[boot error]', e);
+  }
 })();
 </script>
 </body>
 </html>
+
 
 
 
