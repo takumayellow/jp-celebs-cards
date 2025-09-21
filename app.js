@@ -146,3 +146,50 @@ function populateCategories(cards){
   mo.observe(document.documentElement, {childList:true,subtree:true,attributes:true,attributeFilter:['src']});
 })();
 
+
+/* === images patch: auto url fix + cache bust + fallback === */
+(async function(){
+  const bust = Date.now().toString(36);
+  const BASE = location.pathname.replace(/\/[^\/]*$/, "/");   // 例: /jp-celebs-cards/
+  const IMG_PREFIX = BASE + "images/";
+  let map = {};
+  try {
+    map = await fetch(BASE + "data/attr_map.json?" + bust).then(r => r.json());
+  } catch(e){ map = {}; }
+
+  function fileFor(id){
+    const key = String(id);
+    return map[key] || (key + ".jpg");
+  }
+  function setImg(id){
+    const img  = document.getElementById("face");
+    const noim = document.getElementById("noimg");
+    if(!img) return;
+
+    const main = fileFor(id);
+    let triedPng = false;
+
+    function onerr(){
+      if(!triedPng && /\.jpg$/i.test(main)){
+        triedPng = true;
+        img.src = IMG_PREFIX + String(id) + ".png?" + bust;
+      }else{
+        noim && noim.classList.add("show");
+      }
+    }
+
+    img.onload  = () => noim && noim.classList.remove("show");
+    img.onerror = onerr;
+    img.decoding = "async";
+    img.loading  = "lazy";
+    img.src = IMG_PREFIX + main + "?" + bust;
+  }
+
+  // 外から使えるようにフックを置く
+  window.images = { setImg, fileFor, map };
+
+  // 既存データから id を拾って一発表示（なければ何もしない）
+  const id = (window.current?.id ?? window.row?.id ?? window.deck?.[0]?.id);
+  if(id != null) setImg(id);
+})();
+
