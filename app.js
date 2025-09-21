@@ -106,3 +106,43 @@ function populateCategories(cards){
   });
   document.querySelector('#reset').addEventListener('click', ()=>{ document.querySelector('#q').value=''; document.querySelector('#cat').value='__ALL__'; applyFilter(); });
 })();
+
+// === images-patch: auto url fix + cache bust ===
+(function(){
+  function absBase(){ // GitHub Pages配下でも正しく基底を作る
+    const p = location.pathname.endsWith('/') ? location.pathname : location.pathname.replace(/\/[^/]*$/, '/');
+    return location.origin + p;
+  }
+  function bust(u){ return u + (u.includes('?') ? '&' : '?') + 'v=' + Date.now(); }
+
+  function fixImg(img){
+    const s = img.getAttribute('src');
+    if(!s) return;
+    if(!/^https?:\/\//.test(s)){
+      const abs = new URL(s, absBase()).href;
+      img.src = bust(abs);
+    }else if(!/[\?&]v=/.test(s)){
+      img.src = bust(s);
+    }
+  }
+  function scan(){ document.querySelectorAll('img').forEach(fixImg); }
+
+  const mo = new MutationObserver(muts=>{
+    for(const m of muts){
+      if(m.type==='childList'){
+        m.addedNodes.forEach(n=>{
+          if(n.nodeType===1){
+            if(n.tagName==='IMG') fixImg(n);
+            n.querySelectorAll && n.querySelectorAll('img').forEach(fixImg);
+          }
+        });
+      }else if(m.type==='attributes' && m.target.tagName==='IMG' && m.attributeName==='src'){
+        fixImg(m.target);
+      }
+    }
+  });
+
+  window.addEventListener('DOMContentLoaded', scan);
+  mo.observe(document.documentElement, {childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+})();
+
