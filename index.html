@@ -151,8 +151,67 @@ setTimeout(() => { ensureDeck(); }, 500);
   }
 })();
 </script>
+<!-- boot injected v2 -->
+<script>
+(async () => {
+  // 画像カウンタ表示（存在する時だけ）
+  try{
+    const r = await fetch('data/metrics.json?'+Date.now());
+    if(r.ok){
+      const m = await r.json();
+      const wrap = document.getElementById('img-counters') || (function(){
+        const d = document.createElement('div');
+        d.id = 'img-counters';
+        d.style.margin = '8px 0'; d.style.opacity='0.9';
+        d.innerHTML = '画像あり: <span id="countWithImg">0</span> / 総数: <span id="countTotal">0</span>（欠落: <span id="countMissing">0</span> / 画像ファイル: <span id="countImages">0</span>）';
+        document.body.insertBefore(d, document.body.firstChild);
+        return d;
+      })();
+      const g = id => document.getElementById(id);
+      g('countWithImg').textContent = m.withImg ?? 0;
+      g('countTotal').textContent   = m.total   ?? 0;
+      g('countMissing').textContent = m.missing ?? 0;
+      g('countImages').textContent  = m.images  ?? 0;
+    }
+  }catch(e){}
+
+  // デッキ読み込み（with_images.tsv + attr_map.json）
+  // ヘッダのBOM/列順の差を吸収して id/name/yomi/category を取り出し、image を付与
+  try{
+    const [tsvRes, mapRes] = await Promise.all([
+      fetch('data/with_images.tsv?'+Date.now()),
+      fetch('data/attr_map.json?'+Date.now())
+    ]);
+    if(!tsvRes.ok || !mapRes.ok) return;
+
+    const tsv = await tsvRes.text();
+    const map = await mapRes.json();
+
+    const lines  = tsv.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+    const header = lines.shift().split('\t');
+    const col = Object.fromEntries(header.map((h,i)=>[h.trim(), i]));
+    const need = ['id','name','yomi','category'].every(k => k in col);
+    if(!need) return;
+
+    const deck = lines.map(row => {
+      const c = row.split('\t');
+      const id = c[col['id']];
+      const fname = map[id] || (id + '.jpg');
+      return {
+        id, name: c[col['name']], yomi: c[col['yomi']], category: c[col['category']],
+        image: 'images/' + fname
+      };
+    });
+
+    // 既存UIが見に行うように共有変数に置く + 既存 startStudy を呼ぶ
+    window.cards = deck;
+    if (typeof window.startStudy === 'function') window.startStudy(deck);
+  }catch(e){}
+})();
+</script>
 </body>
 </html>
+
 
 
 
