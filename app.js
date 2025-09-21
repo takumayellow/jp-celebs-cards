@@ -193,3 +193,49 @@ function populateCategories(cards){
   if(id != null) setImg(id);
 })();
 
+
+/* === images patch v2: rows-aware === */
+(function(){
+  const bust = Date.now().toString(36);
+  const BASE = location.pathname.replace(/\/[^\/]*$/, "/");   // 例: /jp-celebs-cards/
+  const IMG_PREFIX = BASE + "images/";
+  const img  = document.getElementById("face");
+  const noim = document.getElementById("noimg");
+
+  async function loadMap(){
+    try { return await fetch(BASE + "data/attr_map.json?" + bust).then(r=>r.json()); }
+    catch(e){ return {}; }
+  }
+  function pickId(){
+    return (window.rows?.[0]?.id ?? window.current?.id ?? window.row?.id ?? window.deck?.[0]?.id ?? null);
+  }
+  function setImgById(id,map){
+    if(!img || id==null) return;
+    const key = String(id);
+    const main = (map[key] || (key + ".jpg"));
+    let triedPng = false;
+    function onerr(){
+      if(!triedPng && /\.jpg$/i.test(main)){
+        triedPng = true;
+        img.src = IMG_PREFIX + (key + ".png") + "?" + bust;
+      }else{
+        noim && noim.classList.add("show");
+      }
+    }
+    img.onerror = onerr;
+    img.onload  = ()=> noim && noim.classList.remove("show");
+    img.decoding = "async";
+    img.loading  = "lazy";
+    img.src = IMG_PREFIX + main + "?" + bust;
+  }
+
+  window.bootImages = async function(){
+    const map = await loadMap();
+    const id  = pickId();
+    console.log("[boot-images] rows=", window.rows?.length ?? 0, "id=", id);
+    setImgById(id, map);
+  };
+
+  window.addEventListener("DOMContentLoaded", ()=> bootImages());
+})();
+
