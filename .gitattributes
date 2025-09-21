@@ -1,0 +1,2 @@
+
+images/* -filter -diff -merge -text
