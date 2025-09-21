@@ -5,3 +5,7 @@ logs/
 .DS_Store
 
 *.bak
+
+# local backups
+*.bak*
+
