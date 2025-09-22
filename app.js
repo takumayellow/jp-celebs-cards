@@ -335,3 +335,46 @@ function populateCategories(cards){
   scan();
 })();
 
+
+/* === images patch: id->filename + cache-bust === */
+(function(){
+  const ver = (new URL(location.href)).searchParams.get('v') || Date.now().toString(36);
+  let MAP = {};
+
+  function fixImg(img){
+    try{
+      const url  = new URL(img.src || '', location.href);
+      const base = (url.pathname.split('/').pop() || '').replace(/\?.*$/,''); // 現在のファイル名(拡張子なし想定)
+      // id とみなして、マップか、なければ .jpg を仮定して差し替え
+      if(!/\.(png|jpe?g)$/i.test(base)){
+        const id   = base || (img.dataset && img.dataset.id) || '';
+        if(!id) return;
+        const file = MAP[id] || (id + '.jpg');
+        img.src = `images/${file}?v=${ver}`;
+      }else{
+        // 既に拡張子付きなら cache-bust だけ付与
+        if(!/[?&]v=/.test(url.search)) img.src = url.pathname + `?v=${ver}`;
+      }
+    }catch(e){}
+  }
+
+  function boot(){
+    document.querySelectorAll('img').forEach(fixImg);
+    const mo = new MutationObserver(ms => {
+      ms.forEach(m => {
+        m.addedNodes.forEach(n => {
+          if(n.nodeType===1 && n.tagName==='IMG') fixImg(n);
+          if(n.nodeType===1 && n.querySelectorAll) n.querySelectorAll('img').forEach(fixImg);
+        });
+        if(m.type==='attributes' && m.target.tagName==='IMG' && m.attributeName==='src') fixImg(m.target);
+      });
+    });
+    mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+  }
+
+  fetch('data/attr_map.json?v='+ver).then(r => r.ok ? r.json() : ({})).then(j => {
+    MAP = j || {};
+    if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', boot); } else { boot(); }
+  }).catch(()=>boot());
+})();
+
