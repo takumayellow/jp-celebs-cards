@@ -449,8 +449,14 @@ ensureDeck();
   }).catch(()=>boot());
 })();
 </script>
+<!-- images patch: inline map + cache bust -->
+<script>
+const bust = Date.now(); window.__ver = bust;
+fetch('data/attr_map.json?v='+bust).then(r=>r.ok?r.json():{}).then(j=>{ window.__map=j||{}; });
+</script>
 </body>
 </html>
+
 
 
 

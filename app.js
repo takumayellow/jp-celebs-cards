@@ -378,3 +378,42 @@ function populateCategories(cards){
   }).catch(()=>boot());
 })();
 
+
+// <images-patch v1>
+// id->filename を解決（attr_map.json の値を優先、なければ id.jpg）
+window.fileNameById = (id) => {
+  try {
+    const m = (window.__map||{});
+    const fn = m[id] || (id + '.jpg');
+    return 'images/' + fn;
+  } catch(e){ return 'images/' + id + '.jpg'; }
+};
+// 画像要素に拡張子フォールバック（.jpg が 404なら .png を試す）
+window.applyImgFallback = (img) => {
+  if(!img || img.dataset.fallbackDone) return;
+  img.addEventListener('error', () => {
+    if(img.src.endsWith('.jpg')){
+      img.src = img.src.replace(/\.jpg(\?.*)?$/, '.png');
+    }
+    img.dataset.fallbackDone = '1';
+  }, { once:true });
+};
+// DOM 監視：src が id だけの <img data-id="0001"> を変換
+new MutationObserver(muts=>{
+  muts.forEach(m=>{
+    m.target.querySelectorAll?.('img[data-id]').forEach(img=>{
+      const id = img.getAttribute('data-id');
+      if(id && !img.dataset.mapped){
+        const u = window.fileNameById(id) + '?v=' + (window.__ver||Date.now());
+        img.src = u; img.dataset.mapped='1'; window.applyImgFallback(img);
+      }
+    });
+  });
+}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.querySelectorAll('img[data-id]').forEach(img=>{
+    const id = img.getAttribute('data-id');
+    if(id){ img.src = window.fileNameById(id) + '?v=' + (window.__ver||Date.now()); window.applyImgFallback(img); }
+  });
+});
+
