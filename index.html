@@ -664,8 +664,65 @@ fetch('data/attr_map.json?v='+bust).then(r=>r.ok?r.json():{}).then(j=>{ window._
   }
 })();
 </script>
+<!-- boot-images -->
+<script>
+(function(){
+  const bust = Date.now();
+
+  const headOK = (u)=>fetch(u,{method:'HEAD'}).then(r=>r.ok).catch(()=>false);
+
+  const useImage = (fn)=>{
+    const img = document.getElementById('face');
+    if(!img) return;
+    const noimg = document.getElementById('noimg');
+    img.onload = ()=>{ if(noimg) noimg.style.display='none'; };
+    img.onerror = ()=>{ if(noimg) noimg.style.display=''; };
+    img.src = 'images/'+fn+'?v='+bust;
+  };
+
+  const getId = ()=>{
+    const el = document.querySelector('[data-id]');
+    if(el){
+      const v = (el.getAttribute('data-id')||'').trim();
+      if(v) return v;
+    }
+    const b = (document.body.getAttribute('data-id')||'').trim();
+    if(b) return b;
+    const m = document.body.textContent.match(/(\d{4})/);
+    return m ? m[1] : '';
+  };
+
+  async function resolveAndShow(){
+    const map = window.__imgMap || {};
+    const id  = getId();
+    if(!id) return;
+
+    let fn = map[id] || (id + '.jpg');
+    const cands = [];
+    if(fn) cands.push(fn);
+    if(fn.toLowerCase().endsWith('.jpg')) cands.push(fn.replace(/\.jpg$/i,'.png'));
+    if(fn.toLowerCase().endsWith('.png')) cands.push(fn.replace(/\.png$/i,'.jpg'));
+    cands.push(id+'.jpg', id+'.png');
+
+    for(const f of cands){
+      if(await headOK('images/'+f+'?v='+bust)){ useImage(f); return; }
+    }
+  }
+
+  // マップ取得 → 表示
+  fetch('data/attr_map.json?v='+bust).then(r=>r.ok?r.json():{}).then(j=>{
+    window.__imgMap = j || {};
+    resolveAndShow();
+  }).catch(()=>{ window.__imgMap = {}; resolveAndShow(); });
+
+  // ID変化を監視して再解決
+  const mo = new MutationObserver(()=>resolveAndShow());
+  mo.observe(document.documentElement, {subtree:true, childList:true, attributes:true, attributeFilter:['data-id']});
+})();
+</script>
 </body>
 </html>
+
 
 
 
