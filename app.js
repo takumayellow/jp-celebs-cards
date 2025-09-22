@@ -295,3 +295,43 @@ function populateCategories(cards){
   }).catch(()=>{ boot(); });
 })();
 
+
+// === images patch: url fix + cache-bust ===
+(() => {
+  const repo = '/jp-celebs-cards';
+  const version = new URLSearchParams(location.search).get('v') || Date.now().toString();
+  const bust = (u) => u + (u.includes('?') ? '&' : '?') + 'v=' + version;
+
+  function fixUrl(u) {
+    if (!u) return u;
+    // すでに http(s) or リポジトリパスならそのまま
+    if (/^https?:\/\//i.test(u) || u.startsWith(repo + '/')) return bust(u);
+    // 先頭にリポジトリパスを付与
+    if (u.startsWith('/')) return bust(repo + u);
+    return bust(repo + '/' + u);
+  }
+
+  function fixImg(img) {
+    const src = img.getAttribute('src') || img.dataset?.src;
+    if (src) img.src = fixUrl(src);
+  }
+
+  function scan() {
+    document.querySelectorAll('img').forEach(fixImg);
+  }
+
+  // 既存・追加・src 変更を監視
+  new MutationObserver((mut) => {
+    for (const m of mut) {
+      if (m.type === 'attributes' && m.target.tagName === 'IMG' && m.attributeName === 'src') fixImg(m.target);
+      for (const n of m.addedNodes || []) {
+        if (n.tagName === 'IMG') fixImg(n);
+        n.querySelectorAll?.('img').forEach(fixImg);
+      }
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+
+  window.addEventListener('DOMContentLoaded', scan);
+  scan();
+})();
+
