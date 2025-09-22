@@ -561,8 +561,64 @@ fetch('data/attr_map.json?v='+bust).then(r=>r.ok?r.json():{}).then(j=>{ window._
   }
 })();
 </script>
+<!-- images patch: resolve filename + ext fallback + cache-bust -->
+<script>
+(function(){
+  const bust = Date.now();
+
+  function headOK(url){ return fetch(url,{method:'HEAD'}).then(r=>r.ok).catch(()=>false); }
+
+  function useImage(fn){
+    const img   = document.getElementById('face');
+    const noimg = document.getElementById('noimg');
+    if(!img) return;
+    img.onload  = ()=>{ if(noimg) noimg.style.display = 'none'; };
+    img.onerror = ()=>{ if(noimg) noimg.style.display = ''; };
+    img.src = `images/${fn}?v=${bust}`;
+  }
+
+  async function resolveAndShow(id){
+    const map = window.__imgMap || window.__map || {};
+    let fn = map[id];
+    if(fn){ useImage(fn); return; }
+    for(const ext of ['jpg','png']){
+      const cand = `${id}.${ext}`;
+      if(await headOK(`images/${cand}?v=${bust}`)){ useImage(cand); return; }
+    }
+    const noimg = document.getElementById('noimg');
+    if(noimg) noimg.style.display = '';
+  }
+
+  function findCurrentId(){
+    const el  = document.querySelector('[data-id], .id, .code');
+    const raw = (el?.dataset?.id || el?.textContent || '').trim();
+    const m = raw.match(/\d+/);
+    return m ? m[0] : '';
+  }
+
+  async function boot(){
+    const id = findCurrentId();
+    if(id) await resolveAndShow(id);
+  }
+
+  if(!window.__imgMap && !window.__map){
+    fetch('data/attr_map.json?v='+bust)
+      .then(r=>r.ok?r.json():{})
+      .then(j=>{ window.__imgMap = j||{}; boot(); });
+  }else{
+    boot();
+  }
+
+  const mo = new MutationObserver(()=>boot());
+  mo.observe(document.body,{
+    subtree:true, childList:true, characterData:true,
+    attributes:true, attributeFilter:['data-id']
+  });
+})();
+</script>
 </body>
 </html>
+
 
 
 
