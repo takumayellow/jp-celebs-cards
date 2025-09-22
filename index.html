@@ -616,8 +616,57 @@ fetch('data/attr_map.json?v='+bust).then(r=>r.ok?r.json():{}).then(j=>{ window._
   });
 })();
 </script>
+<!-- images loader injected -->
+<script>
+(()=>{ // minimal, framework-free
+  const bust = Date.now();
+  let map = {};
+  // 1) attr_map.json を読む（失敗しても空で続行）
+  fetch('data/attr_map.json?v='+bust).then(r=>r.ok?r.json():{}).then(j=>{
+    map = j || {};
+    boot();
+  }).catch(()=>boot());
+
+  // id -> 候補URL（map命中ならそれを優先。なければ jpg→png）
+  const candidates = (id)=>{
+    id = String(id||'').trim();
+    const m = map[id];
+    if(m) return [images/\?v=\];
+    return [images/\Length.jpg?v=\, images/\Length.png?v=\];
+  };
+
+  // 画像を試行しながら表示。成功で「画像なし」を隠す
+  function show(id){
+    const img = document.getElementById('face');
+    const noimg = document.getElementById('noimg');
+    if(!img) return;
+    const list = candidates(id);
+    let i = 0;
+    const tryNext = ()=>{
+      if(i>=list.length){ img.removeAttribute('src'); if(noimg) noimg.style.display=''; return; }
+      img.onload = ()=>{ if(noimg) noimg.style.display='none'; };
+      img.onerror = ()=>{ i++; tryNext(); };
+      img.src = list[i];
+    };
+    tryNext();
+  }
+
+  // あなたのアプリが現在カードIDをどこかに置く想定：
+  // 例: <div id="card" data-id="0001"> の data-id が変わる
+  function boot(){
+    const getId = ()=> document.querySelector('[data-id]')?.getAttribute('data-id');
+    const apply = ()=>{ const id = getId(); if(id) show(id); };
+    apply();
+    new MutationObserver(apply).observe(document.body, {subtree:true, attributes:true, attributeFilter:['data-id']});
+    // デバッグ用に手動表示も可
+    window.__showImage = show;
+    window.__imgMap = map;
+  }
+})();
+</script>
 </body>
 </html>
+
 
 
 
