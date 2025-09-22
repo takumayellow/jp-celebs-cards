@@ -239,3 +239,59 @@ function populateCategories(cards){
   window.addEventListener("DOMContentLoaded", ()=> bootImages());
 })();
 
+
+/* === images patch: url fix + cache bust === */
+(function(){
+  const version = (new URL(location.href)).searchParams.get("v") || Date.now().toString();
+  let __map = null;
+
+  function pickId(el){
+    return (el.dataset && (el.dataset.id || el.dataset.srcId)) ||
+           el.getAttribute('data-id') || el.getAttribute('data-src-id') ||
+           el.getAttribute('alt') || '';
+  }
+
+  function urlFor(id){
+    const fn = (__map && __map[id]) ? __map[id] : (id + '.jpg');
+    return `images/${fn}?v=${version}`;
+  }
+
+  function fixImg(el){
+    const id = String(pickId(el) || '').trim();
+    if(!id) return;
+    el.src = urlFor(id);
+    el.onerror = ()=>{
+      const cur = el.src;
+      if(/\.(jpg)(\?|$)/i.test(cur)){ el.onerror=null; el.src = cur.replace(/\.jpg/i,'.png'); return; }
+      if(/\.(png)(\?|$)/i.test(cur)){ el.onerror=null; el.src = cur.replace(/\.png/i,'.jpg'); return; }
+      el.onerror=null;
+    };
+  }
+
+  function scan(root=document){
+    if(!root.querySelectorAll) return;
+    root.querySelectorAll('img').forEach(fixImg);
+  }
+
+  function boot(){
+    scan(document);
+    const mo = new MutationObserver(muts=>{
+      muts.forEach(m=>{
+        m.addedNodes.forEach(n=>{
+          if(n.nodeType!==1) return;
+          if(n.tagName==='IMG') fixImg(n);
+          n.querySelectorAll && n.querySelectorAll('img').forEach(fixImg);
+        });
+        if(m.type==='attributes' && m.target?.tagName==='IMG' && m.attributeName==='src'){ fixImg(m.target); }
+      });
+    });
+    mo.observe(document.documentElement, {childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+  }
+
+  fetch(`data/attr_map.json?v=${version}`).then(r=>r.ok?r.json():{}).then(j=>{
+    __map = j || {};
+    if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', boot); }
+    else{ boot(); }
+  }).catch(()=>{ boot(); });
+})();
+
