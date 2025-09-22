@@ -21,7 +21,7 @@
   const bust = Date.now();
   const res = await fetch('data/attr_map.json?v='+bust);
   const map = await res.json();
-  const items = Object.entries(map).map(([id,fn])=>({id,fn}));
+  const items = Object.entries(map).map(([id,fn])=>({id,fn})).sort((a,b)=>a.id.localeCompare(b.id));
   const grid = document.getElementById('grid');
   const count = document.getElementById('count');
   function render(filter=''){
