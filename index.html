@@ -360,8 +360,55 @@ async function ensureDeck(){
 ensureDeck();
 })();
 </script>
+<!-- images patch: url fix + cache bust -->
+<script>
+(function(){
+  const version = Date.now().toString();
+  let map = {};
+  function fix(img){
+    try{
+      const url = new URL(img.src, location.href);
+      if(!/\/images\//.test(url.pathname)) return;
+      const file = url.pathname.split('/').pop();           // 例: 0001.jpg
+      const base = file.split('.')[0];                      // 例: 0001
+      const real = map[base] || map[base.padStart(4,'0')] || '';
+      if(real && file !== real){
+        img.src = images/?v=;
+      }else if(!/\.(jpg|jpeg|png)$/i.test(file) && real){
+        img.src = images/?v=;
+      }else{
+        // せめてキャッシュバスト
+        img.src = url.pathname + '?v=' + version;
+      }
+    }catch(e){}
+  }
+  function scan(){
+    document.querySelectorAll('img').forEach(fix);
+  }
+  // 変更検知で常に補正
+  const mo = new MutationObserver(muts=>{
+    for(const m of muts){
+      for(const n of m.addedNodes||[]){
+        if(n.nodeType===1){
+          if(n.tagName==='IMG') fix(n);
+          n.querySelectorAll && n.querySelectorAll('img').forEach(fix);
+        }
+      }
+      if(m.type==='attributes' && m.target.tagName==='IMG' && m.attributeName==='src'){ fix(m.target); }
+    }
+  });
+  mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+
+  fetch('data/attr_map.json?v='+version).then(r=>r.ok?r.json():{}).then(j=>{
+    map = j || {};
+    if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', scan); }
+    else { scan(); }
+  }).catch(()=>{ /* mapが読めなくても動作継続 */ });
+})();
+</script>
 </body>
 </html>
+
 
 
 
