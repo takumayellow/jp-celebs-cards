@@ -454,8 +454,117 @@ ensureDeck();
 const bust = Date.now(); window.__ver = bust;
 fetch('data/attr_map.json?v='+bust).then(r=>r.ok?r.json():{}).then(j=>{ window.__map=j||{}; });
 </script>
+<!-- images patch: map+fallback+cache-bust -->
+<script>
+(function(){
+  const bust = Date.now();
+  // 1) マップを取得（キャッシュバスト付）
+  window.__map = {};
+  fetch('data/attr_map.json?v='+bust)
+    .then(r => r.ok ? r.json() : {})
+    .then(j => { window.__map = j || {}; });
+
+  // 2) id -> 画像URL への解決
+  function toUrl(id){
+    const m  = window.__map || {};
+    const fn = m[id];
+    return fn ? ('images/'+fn) : ('images/'+id+'.jpg');
+  }
+
+  // 3) 1枚適用（拡張子なし src を置換し、jpg失敗時にpngへフォールバック）
+  function applyOne(img){
+    const src = img.getAttribute('src') || '';
+    if(/\.(jpe?g|png)(\?|#|$)/i.test(src)) return; // すでに拡張子あり
+    const m = src.match(/images\/([0-9]{3,6})/);   // images/0001 形式を想定
+    if(!m) return;
+    const id = m[1];
+    img.src = toUrl(id) + '?v='+bust;
+    img.onerror = function(){
+      if(img.dataset.fallbackTried) return;
+      img.dataset.fallbackTried = '1';
+      img.src = 'images/'+id+'.png?v='+bust;
+    };
+  }
+
+  // 4) 全体スキャン＋MutationObserverで動的変更にも追従
+  function scan(){
+    document.querySelectorAll('img[src*="images/"]').forEach(applyOne);
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', scan);
+  }else{
+    scan();
+  }
+  const mo = new MutationObserver(ms => {
+    for(const m of ms){
+      if(m.type === 'attributes' && m.attributeName === 'src' && m.target.tagName === 'IMG'){
+        applyOne(m.target);
+      }
+      if(m.type === 'childList'){ scan(); }
+    }
+  });
+  mo.observe(document.documentElement, {subtree:true, childList:true, attributes:true, attributeFilter:['src']});
+})();
+</script>
+<!-- images patch: url mapping + ext fallback + cache-bust -->
+<script>
+/* images patch: url mapping + ext fallback + cache-bust */
+(() => {
+  const bust = Date.now();
+  // 1) 画像ファイル名マップを取得（id => 実ファイル名）
+  window.__imgMap = window.__imgMap || {};
+  fetch('data/attr_map.json?v=' + bust)
+    .then(r => r.ok ? r.json() : {})
+    .then(j => { window.__imgMap = j || {}; boot(); })
+    .catch(() => boot());
+
+  function buildList(id) {
+    const fn = (window.__imgMap && window.__imgMap[id]) || (id + '.jpg');
+    const list = ['images/' + fn];           // マップされた実ファイル
+    if(!/\.png$/i.test(fn)) list.push('images/' + id + '.png'); // jpg→png フォールバック候補
+    return list.map(u => u + '?v=' + bust);  // cache-bust
+  }
+
+  function getIdFromImg(img) {
+    // data-id 優先、だめなら src から 連番っぽい数字を拾う
+    const d = img.getAttribute('data-id');
+    if (d && /^\d+$/.test(d)) return d;
+    const m = (img.getAttribute('src') || '').match(/(\d{3,})/);
+    return m ? m[1] : null;
+  }
+
+  function applyOne(img) {
+    if (img.__patched) return;
+    const id = getIdFromImg(img);
+    if (!id) return;
+    const list = buildList(id);
+    let i = 0;
+    const set = () => { img.src = list[i]; };
+    img.addEventListener('error', () => { if (++i < list.length) set(); }, { passive:true });
+    img.__patched = true;
+    set();
+  }
+
+  function scan() {
+    document.querySelectorAll('img[data-id], img[src*="images/"]').forEach(applyOne);
+  }
+
+  function boot() {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', scan, { once:true });
+    } else {
+      scan();
+    }
+    // 動的追加にも追従
+    new MutationObserver(() => scan())
+      .observe(document.documentElement, { subtree:true, childList:true, attributes:true, attributeFilter:['src'] });
+  }
+})();
+</script>
 </body>
 </html>
+
+
 
 
 
