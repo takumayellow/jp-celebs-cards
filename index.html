@@ -720,8 +720,53 @@ fetch('data/attr_map.json?v='+bust).then(r=>r.ok?r.json():{}).then(j=>{ window._
   mo.observe(document.documentElement, {subtree:true, childList:true, attributes:true, attributeFilter:['data-id']});
 })();
 </script>
+<!-- images loader v2 -->
+<script>
+(async () => {
+  const bust = Date.now();            // キャッシュ無効化
+  let map = {};
+  try {
+    const r = await fetch('data/attr_map.json?v='+bust);
+    map = await r.json();
+  } catch(e){ map = {}; }
+
+  const face = document.getElementById('face');
+  const noimg = document.getElementById('noimg');
+
+  async function headOK(url){
+    try { const r = await fetch(url, {method:'HEAD', cache:'no-store'}); return r.ok; }
+    catch(e){ return false; }
+  }
+
+  async function showFor(id){
+    if(!face) return;
+    const cands = [];
+    if (map[id]) cands.push(map[id]);
+    cands.push(id + '.jpg', id + '.png');    // フォールバック
+    for (const fn of cands){
+      const url = 'images/' + fn + '?v=' + bust;
+      if (await headOK(url)){
+        face.src = url;
+        if(noimg) noimg.style.display = 'none';
+        return;
+      }
+    }
+    face.removeAttribute('src');
+    if(noimg) noimg.style.display = '';
+  }
+
+  // 初期 & 変更監視（body の data-id が変わるたびに切替）
+  const first = document.body.getAttribute('data-id');
+  if (first) showFor(first);
+  new MutationObserver(() => {
+    const id = document.body.getAttribute('data-id');
+    if (id) showFor(id);
+  }).observe(document.body, { attributes:true, attributeFilter:['data-id'] });
+})();
+</script>
 </body>
 </html>
+
 
 
 
