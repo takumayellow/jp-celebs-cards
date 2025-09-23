@@ -764,24 +764,112 @@ fetch('data/attr_map.json?v='+bust).then(r=>r.ok?r.json():{}).then(j=>{ window._
   }).observe(document.body, { attributes:true, attributeFilter:['data-id'] });
 })();
 </script>
+<script id="img-loader">
+(()=> {
+  const bust = () => Date.now().toString().slice(-6);
+  let map = null;
+
+  async function loadMap() {
+    if (map) return map;
+    try {
+      const res = await fetch('data/attr_map.json?v=' + bust(), { cache: 'no-store' });
+      map = await res.json();
+    } catch (e) {
+      console.warn('[img] map load failed, use fallback', e);
+      map = {};
+    }
+    return map;
+  }
+
+  function useFile(fn) {
+    const img = document.getElementById('face');
+    const no = document.getElementById('noimg');
+    if (!img) return;
+
+    img.onload = () => { if (no) no.style.display = 'none'; };
+    img.onerror = () => {
+      // jpg→png フォールバック（1回だけ）
+      if (!img.dataset.fallbackTried && /\.jpg(\?|$)/i.test(img.src)) {
+        img.dataset.fallbackTried = '1';
+        img.src = img.src.replace(/\.jpg(\?.*)?$/i, '.png?v=' + bust());
+      } else {
+        if (no) no.style.display = '';
+        img.removeAttribute('src');
+      }
+    };
+
+    img.dataset.fallbackTried = '';
+    img.src = 'images/' + fn + '?v=' + bust();
+  }
+
+  async function showById(id) {
+    const m = await loadMap();
+    const mapped = m[id];            // 例: "170320299.jpg"
+    const fn = mapped || (id + '.jpg');  // mapになければ jpg を試す（onerrorで png）
+    useFile(fn);
+  }
+
+  // アプリが body の data-id を更新する想定（今の仕組みのまま使える）
+  function boot() {
+    const run = () => {
+      const id = document.body.dataset.id;
+      if (id) showById(id);
+    };
+    new MutationObserver(run).observe(document.body, { attributes:true, attributeFilter:['data-id'] });
+    run();
+  }
+
+  // 外から呼びたい場合用（任意）： window.__img.show('1234')
+  window.__img = { show: showById, boot };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+<!-- images patch: loader + map -->
+<script>
+(function(){
+  const bust = Date.now();
+
+  async function headOK(u){
+    try{ const r = await fetch(u,{method:'HEAD'}); return r.ok; }catch(e){ return false; }
+  }
+
+  function useImg(fn){
+    const img  = document.getElementById('face');
+    const noim = document.getElementById('noimg');
+    if(!img) return;
+    img.onload  = ()=>{ if(noim) noim.style.display='none'; };
+    img.onerror = ()=>{ img.removeAttribute('src'); if(noim) noim.style.display=''; };
+    img.src = 'images/' + fn + '?v=' + bust;
+  }
+
+  async function showById(id){
+    if(!id) return;
+    try{
+      const map = (window.__imgMap||window.__map||{});
+      const fn  = map[id];
+      if(fn){ useImg(fn); return; }
+      for(const ext of ['jpg','png']){
+        const cand = id + '.' + ext;
+        if(await headOK('images/' + cand + '?v=' + bust)){ useImg(cand); return; }
+      }
+    }catch(e){}
+  }
+
+  // 1) map を読み込み（初回）
+  fetch('data/attr_map.json?v='+bust).then(r=>r.json()).then(j=>{ window.__imgMap = j||{}; });
+
+  // 2A) カード切替イベントで表示
+  window.addEventListener('cards:show', e => showById(e && e.detail && e.detail.id));
+
+  // 2B) body[data-id] を監視して表示
+  const mo = new MutationObserver(()=>{ const id = document.body && document.body.getAttribute('data-id'); if(id) showById(id); });
+  mo.observe(document.documentElement, {subtree:true, childList:true, attributes:true, attributeFilter:['data-id']});
+})();
+</script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
